@@ -1,0 +1,19 @@
+[network]
+name = "devnet"
+
+stacks_node_image = "blockstack/stacks-blockchain:3.2.0.0.0-alpine"
+
+bitcoins_per_block = 10
+bitcoin_block_time = 30000
+
+bitcoin_rpc_username = "devnet"
+bitcoin_rpc_password = "devnet"
+
+bitcoin_node_rpc_address = "http://localhost:18443"
+stacks_node_rpc_address = "http://localhost:20443"
+stacks_api_address = "http://localhost:3999"
+deployment_fee_rate = 10
+
+[accounts.deployer]
+mnemonic = "<YOURS HERE>"
+balance = 100_000_000_000_000

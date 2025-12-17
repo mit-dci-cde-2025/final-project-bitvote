@@ -1,0 +1,32 @@
+---
+id: 0
+name: Devnet deployment
+network: devnet
+stacks-node: "http://localhost:20443"
+bitcoin-node: "http://devnet:devnet@localhost:18443"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - contract-publish:
+            contract-name: sip-010-trait-ft-standard
+            expected-sender: ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE
+            cost: 6830
+            path: contracts/sip-010-trait-ft-standard.clar
+            anchor-block-only: true
+            clarity-version: 2
+        - contract-publish:
+            contract-name: governance-token
+            expected-sender: ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE
+            cost: 11280
+            path: contracts/governance-token.clar
+            anchor-block-only: true
+            clarity-version: 2
+        - contract-publish:
+            contract-name: proposal-contract
+            expected-sender: ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE
+            cost: 24940
+            path: contracts/proposal.clar
+            anchor-block-only: true
+            clarity-version: 2
+      epoch: "2.5"

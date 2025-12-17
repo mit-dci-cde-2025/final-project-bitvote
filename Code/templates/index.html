@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>BitVote Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>BitVote Governance</h1>
+            <button id="connect-wallet" class="btn btn-primary">Connect Wallet</button>
+            <a href="/new" class="btn btn-outline-dark">New Proposal</a>
+        </div>
+
+        <div class="row">
+            <h2>Active Proposals</h2>
+            {% if active|length == 0 %}
+                <div style="text-align: center; height: 50vh; display: flex; align-items: center; justify-content: center;">
+                    <h3>There are no proposals active at the moment!</h2>
+                </div>
+            {% endif %}
+            {% for proposal in active %}
+            <div class="col-md-4">
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ proposal.title }}</h5>
+                        <p class="card-text">
+                            <strong>Yes:</strong> {{ proposal['yes-votes'] }} <br>
+                            <strong>No:</strong> {{ proposal['no-votes'] }}
+                        </p>
+                        <p class="card-text">
+                            <strong>Blocks left:</strong> {{ proposal['end-block'] -  block_height }}
+                        </p>
+                        <a href="/proposal/{{ proposal['category-id'] | int }}" class="btn btn-outline-dark">View & Vote</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            <hr>
+            <h2>Inactive Proposals</h2>
+
+
+            {% for proposal in inactive %}
+            <div class="col-md-4">
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ proposal.title }}</h5>
+                        <p class="card-text">
+                            <strong>Yes:</strong> {{ proposal['yes-votes'] }} <br>
+                            <strong>No:</strong> {{ proposal['no-votes'] }}
+                            <strong>It's been closed for </strong> {{ block_height - proposal['end-block'] }}
+                        </p>
+                        <a href="/proposal/{{ proposal['category-id'] | int }}" class="btn btn-outline-dark">View</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <script type="module">
+        import { AppConfig, UserSession, showConnect, isConnected, disconnect, connect, getLocalStorage } from "https://esm.sh/@stacks/connect";
+        import { openContractCall } from "https://esm.sh/@stacks/connect";
+        import { fetchCallReadOnlyFunction, cvToValue } from "https://esm.sh/@stacks/transactions";
+        let bns = "";
+
+        async function checkClaimStatus(userAddress) {
+            const result = await fetchCallReadOnlyFunction({
+                contractAddress: "{{ contract_addr }}",
+                contractName: "{{ contract_name }}",
+                functionName: 'has-claimed',
+                functionArgs: [],
+                senderAddress: userAddress,
+                network: '{{ network }}',
+            });
+
+            return cvToValue(result).value; 
+        }
+
+        function triggerClaimTransaction() {
+            openContractCall({
+                contractAddress: "{{ contract_addr }}",
+                contractName: "{{ contract_name }}",
+                functionName: 'claim-tokens',
+                functionArgs: [],
+                network: "{{ network }}",
+            });
+        }
+
+        async function connectWallet() {
+            if (!isConnected()) {
+                const res = await connect({
+                    forceWalletSelect: true,
+                    enableOverrides: false,
+                    enableLocalStorage: true,
+                });
+
+                const data = getLocalStorage();
+                const stxAddress = data?.addresses?.stx?.[0]?.address ?? null;
+
+                if (stxAddress) {
+                    bns = await getBns(stxAddress).catch(() => "");
+                    const alreadyClaimed = await checkClaimStatus(stxAddress);
+                    if (! alreadyClaimed) {
+                        triggerClaimTransaction();
+                    }
+                }
+            }
+
+            updateUI();
+        }
+
+        function disconnectWallet() {
+            disconnect();
+            bns = "";
+            updateUI();
+        }
+
+        function updateUI() {
+            const btn = document.getElementById("connect-wallet");
+            if (isConnected()) {
+                btn.textContent = bns ? `Connected: ${bns}` : "Disconnect Wallet";
+                btn.classList.remove("btn-primary");
+                btn.classList.add("btn-success");
+                btn.onclick = disconnectWallet;
+            } else {
+                btn.textContent = "Connect Wallet";
+                btn.classList.remove("btn-success");
+                btn.classList.add("btn-primary");
+                btn.onclick = connectWallet;
+            }
+        }
+
+        async function getBns(stxAddress) {
+            const url = "{{network}}" == "testnet" ? `https://api.bnsv2.com/testnet/names/address/${stxAddress}/valid` 
+                                                   : `http://localhost:3999/extended/v1/address/${stxAddress}/names`
+            const r = await fetch(url);
+            const j = await r.json();
+            return j?.names?.[0]?.full_name ?? "";
+        }
+
+        if (isConnected()) updateUI();
+
+        document.getElementById("connect-wallet").addEventListener("click", connectWallet);
+    </script>
+
+
+    </body>
+</html>

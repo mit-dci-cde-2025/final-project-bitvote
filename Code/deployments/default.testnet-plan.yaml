@@ -1,0 +1,32 @@
+---
+id: 0
+name: Testnet deployment
+network: testnet
+stacks-node: "https://api.testnet.hiro.so"
+bitcoin-node: "http://blockstack:blockstacksystem@bitcoind.testnet.stacks.co:18332"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        # - contract-publish:
+        #     contract-name: sip-010-trait-ft-standard
+        #     expected-sender: ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE
+        #     cost: 6830
+        #     path: contracts/sip-010-trait-ft-standard.clar
+        #     anchor-block-only: true
+        #     clarity-version: 2
+        - contract-publish:
+            contract-name: governance-token-v2
+            expected-sender: ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE
+            cost: 11280
+            path: contracts/governance-token.clar
+            anchor-block-only: true
+            clarity-version: 2
+        # - contract-publish:
+        #     contract-name: proposal-contract-v6
+        #     expected-sender: ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE
+        #     cost: 39100
+        #     path: contracts/proposal.clar
+        #     anchor-block-only: true
+        #     clarity-version: 2
+      epoch: "2.5"

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>{{ proposals[0].title }}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-light">
+        {% if status == 1 and proposals[0].level < 2 %}
+            <div class="mt-3" id="levelup-container" style="display: none;">
+                <hr>
+                <div class="alert alert-info">
+                    <strong>Proposal Passed!</strong> As the creator, you can now advance this to Level {{ proposals[0].level + 1 }}.
+                </div>
+                <a href="/levelup/{{ proposals[0]['category-id'] }}" class="btn btn-primary">
+                    Add Level {{ proposal.level + 1 }} Proposal &rarr;
+                </a>
+            </div>
+        {% endif %}
+        <div class="container mt-5">
+            <a href="/" class="text-decoration-none">&larr; Back to Proposals</a>
+            {% for proposal in proposals %}
+            <div class="card mt-4 p-4">
+                <h2 class="mt-3">{{ proposal.title }} (Level {{ proposal.level }})</h2>
+                <p><strong>Created by:</strong> {{ proposal['created-by'] }} <br>
+
+                    <strong>Block lifecycle ({{ proposal['end-block'] - proposal['start-block'] }} blocks):</strong> {{ proposal['start-block'] }} to {{ proposal['end-block'] }}
+                    {% if is_active and proposal == proposals[0] %}
+                        (Still Active)
+                    {% endif %}
+                    <br>
+                {% if proposal.bip != 0 %}
+                    Bip {{ proposal.bip }} (given by {{ proposal['bip-given-by'] }})<br>
+                {% endif %}
+                
+                <strong>Layer:</strong> {{ proposal.layer }}<br>
+                <strong>Type:</strong> {{ proposal.type }}</p>
+
+                {% if proposal.copyright %}
+                    <p>{{ proposal.copyright }}</p>
+                {% endif %}
+                <h3>Abstract</h3>
+                <p class="mt-3">{{ proposal.abstract }}</p>
+                <h3>Motivation</h3>
+                <p class="mt-3">{{ proposal.motivation }}</p>
+
+                {% if proposal.specification %}
+                    <h3>Specification</h3>
+                    <p class="mt-3">{{ proposal.specification }}</p>
+                {% endif %}
+            
+                {% if proposal['back-compat'] %}
+                    <h3>Back Compatibility</h3>
+                    <p class="mt-3">{{ proposal['back-compat'] }}</p>
+                {% endif %}
+                
+                {% if proposal['ref-imp'] %}
+                    <h3>Reference Implementation</h3>
+                    <p class="mt-3">{{ proposal['ref-imp'] }}</p>
+                {% endif %}
+
+                <h4>Tally</h4>
+                <div class="progress mb-3" style="height: 28px;">
+                    <div id="bar-yes-{{ proposal.index }}" class="progress-bar bg-success" role="progressbar" style="width: 0%" aria-valuemin="0" aria-valuemax="100">
+                        Yes
+                    </div>
+                    <div id="bar-no-{{ proposal.index }}" class="progress-bar bg-danger" role="progressbar" style="width: 0%" aria-valuemin="0" aria-valuemax="100">
+                        No
+                    </div>
+                </div>
+                
+                {% if is_active and proposal == proposals[0] %}
+                    <hr>
+                    <h4>Cast Your Vote</h4>
+                    <p class="text-muted">Voting requires STX for gas fees and your Governance Token balance.</p>
+                    
+                    <div class="d-flex gap-3">
+                        <button id="btn-vote-yes" class="btn btn-success btn-lg">Vote YES</button>
+                        <button id="btn-vote-no" class="btn btn-danger btn-lg">Vote NO</button>
+                    </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <script type="module">
+            import { isConnected, openContractCall, getLocalStorage } from 'https://esm.sh/@stacks/connect';
+            import { uintCV, trueCV, falseCV, cvToValue, fetchCallReadOnlyFunction } from 'https://esm.sh/@stacks/transactions';
+
+
+            function handleVote(voteChoice) {
+                if (!isConnected()) {
+                    alert("Please connect your wallet on the home page first.");
+                    return;
+                }
+
+                const voteValue = voteChoice ? trueCV() : falseCV();
+
+                const options = {
+                    contractAddress: "{{ contract_addr }}", 
+                    contractName: "{{ contract_name }}",
+                    functionName: 'cast-vote-and-cleanup',
+                    functionArgs: [ uintCV("{{ proposals[0]['category-id'] }}"), uintCV("{{ proposals[0].index }}"), voteValue, "{{stale}}" ],
+                    appDetails: {
+                        name: 'BitVote',
+                        icon: window.location.origin + '/favicon.ico',
+                    },
+                    onFinish: (data) => {
+                        alert('Vote submitted! TX: ' + data.txId);
+                        refreshVotes("{{ proposals[0].index }}");
+                    },
+                    network: "{{ network }}", 
+                };
+                openContractCall(options);
+            };
+
+            async function fetchVotesFromContract(senderAddress, index) { 
+                const cv = await fetchCallReadOnlyFunction({
+                    contractAddress: "{{ contract_addr }}", 
+                    contractName: "{{ contract_name }}",
+                    functionName: "get-proposal",
+                    functionArgs: [uintCV("{{ proposals[0]['category-id'] }}"), uintCV(index)],
+                    senderAddress: senderAddress ?? "{{ contract_addr }}",
+                    network: "{{ network }}",
+                });
+
+                const val = cvToValue(cv, true);
+
+                if (!val) return { yes: 0, no: 0 };
+
+                const yes = Number(val['value']["yes-votes"]['value'] ?? 0);
+                const no = Number(val['value']["no-votes"]['value'] ?? 0);
+                return { yes, no };
+            }
+
+            function updateVotingBars(yesVotes, noVotes, index) {
+                const yesBar = document.getElementById(`bar-yes-${index}`);
+                const noBar = document.getElementById(`bar-no-${index}`);
+
+                if (!yesBar || !noBar) return;
+
+                const total = yesVotes + noVotes;
+
+                let yesPct = 0;
+                let noPct = 0;
+
+                if (total > 0) {
+                    yesPct = Math.round((yesVotes / total) * 100);
+                    noPct = 100 - yesPct;
+                }
+
+                yesBar.style.width = `${yesPct}%`;
+                noBar.style.width = `${noPct}%`;
+
+                yesBar.setAttribute("aria-valuenow", yesPct);
+                noBar.setAttribute("aria-valuenow", noPct);
+
+                yesBar.textContent = `Yes ${yesPct}%`;
+                noBar.textContent = `No ${noPct}%`;
+            }
+
+            async function refreshVotes(index) {
+                const { yes, no } = await fetchVotesFromContract("{{ contract_addr }}", index);
+                updateVotingBars(yes, no, index);
+            }
+            
+
+            {% for proposal in proposals %}
+                refreshVotes("{{ proposal.index }}");
+            {% endfor %}
+
+            const yesBtn = document.getElementById('btn-vote-yes');
+            const noBtn = document.getElementById('btn-vote-no');
+
+            if (yesBtn) yesBtn.addEventListener('click', () => handleVote(true));
+            if (noBtn) noBtn.addEventListener('click', () => handleVote(false));
+
+            if (isConnected()){
+                const data = getLocalStorage();
+                const stxAddress = data?.addresses?.stx?.[0]?.address ?? null;
+
+                if (stxAddress && "{{proposals[0]['created-by']}}" === stxAddress) {
+                    const btn = document.getElementById("levelup-container");
+                    if (btn) btn.style.display = "block";
+                }
+            }
+            
+        </script>
+
+    </body>
+</html>
